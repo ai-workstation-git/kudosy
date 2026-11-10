@@ -25,6 +25,14 @@ export function formatRelative(isoString) {
   return d.toLocaleString(localeFor(currentLang()), { dateStyle: 'short', timeStyle: 'short' });
 }
 
+/** Format an ISO timestamp as a medium date plus short time (browser time zone); '' if missing/invalid. */
+export function formatActivityDate(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString(localeFor(currentLang()), { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 /** Format an ISO timestamp as HH:MM. */
 export function formatTime(isoString) {
   if (!isoString) return '—';

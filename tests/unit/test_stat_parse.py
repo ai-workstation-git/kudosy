@@ -86,6 +86,16 @@ class TestParseDistance:
     def test_sub_kilometre(self) -> None:
         assert parse_distance("0.45 km") == pytest.approx(450.0)
 
+    def test_miles_to_metres(self) -> None:
+        assert parse_distance("3.1 mi") == pytest.approx(3.1 * 1609.34)
+
+    def test_miles_with_abbr_markup(self) -> None:
+        raw = "3.1<abbr class='unit' title='miles'> mi</abbr>"
+        assert parse_distance(raw) == pytest.approx(3.1 * 1609.34)
+
+    def test_miles_with_comma_thousands(self) -> None:
+        assert parse_distance("1,300 mi") == pytest.approx(1300 * 1609.34)
+
     def test_none_input(self) -> None:
         assert parse_distance(None) is None
 

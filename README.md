@@ -18,8 +18,8 @@
   activity-name regex overrides, per-athlete allow/deny lists
 - 🔁 **Scheduler** — configurable interval + jitter, quiet-hours matrix (7×24, drag-to-paint,
   timezone-aware), enable/disable, dry-run mode
-- 📡 **Live feed view** — see your following feed with per-activity kudo decisions and reasons,
-  send single kudos manually, filter by status/sport/text
+- 📡 **Live feed view** — see your following feed with per-activity date, kudo decisions and
+  reasons, send single kudos manually, filter by status/sport/text
 - 📊 **Statistics** — run history with charts and per-sport aggregations
 - 🔔 **Notifications** — webhook alerts (ntfy, Slack, Discord, Gotify or generic HTTP) on runs,
   auth errors, and as a daily digest
@@ -54,6 +54,10 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 KUDOSY_DATA_DIR=./data KUDOSY_PORT=8080 python -m kudosy
 ```
+
+On Windows, create the venv and install as above (activate with `.venv\Scripts\activate`), then
+start Kudosy with `start_kudosy.bat`. It activates `.venv` and runs `python -X utf8 -m kudosy`
+(UTF-8 mode avoids encoding errors with the Windows default code page).
 
 ## Getting Your Strava Cookies
 
@@ -138,6 +142,10 @@ Practical consequence: activities that never have a distance (e.g. weight traini
 by a distance rule, and a catch-all minimum distance therefore skips them too. To kudo them, set the
 minimum distance to 0 for that sport or category (optionally with a duration rule), use the athlete
 allow list, or an activity-name pattern; all three bypass or avoid the distance check.
+
+Distances are read in kilometres, metres or miles (Strava accounts set to imperial units show
+`mi`). Miles are converted to metres (1 mi = 1609.34 m), so distance rules work the same whatever
+unit your Strava account displays.
 If none of the feed's activities has a parsable distance, the run log shows a WARNING
 ("N of M activities have no parsable distance").
 

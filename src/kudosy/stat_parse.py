@@ -51,23 +51,28 @@ def strip_unit_markup(raw: str | None) -> str | None:
 
 # ── Distance ─────────────────────────────────────────────────────────────────
 
-# Handles "5.17 km", "53.24 km", "1,300 m", "116 m" (thousands comma-separator)
+# Handles "5.17 km", "53.24 km", "1,300 m", "116 m", "3.1 mi" (thousands
+# comma-separator). "mi" is tried before "m" in the alternation so "mi" is not
+# cut short at "m".
 _DIST_RE = re.compile(
-    r"(?P<val>[\d,]+(?:\.\d+)?)\s*(?P<unit>km|m)\b",
+    r"(?P<val>[\d,]+(?:\.\d+)?)\s*(?P<unit>km|mi|m)\b",
     re.IGNORECASE,
 )
+
+_METRES_PER_MILE = 1609.34
 
 
 def parse_distance(raw: str | None) -> float | None:
     """Parse a distance string and return metres, or ``None`` if unparseable.
 
-    Handles both km and m units, including comma-thousands separators.
+    Handles km, m and mi units, including comma-thousands separators.
 
     Examples::
 
         "5.17 km"  → 5170.0
         "1,300 m"  → 1300.0
         "116 m"    → 116.0
+        "3.1 mi"   → 4987.9
     """
     if not raw:
         return None
@@ -78,7 +83,12 @@ def parse_distance(raw: str | None) -> float | None:
     if not m:
         return None
     val = float(m.group("val").replace(",", ""))
-    return val * 1000.0 if m.group("unit").lower() == "km" else val
+    unit = m.group("unit").lower()
+    if unit == "km":
+        return val * 1000.0
+    if unit == "mi":
+        return val * _METRES_PER_MILE
+    return val
 
 
 # ── Duration ──────────────────────────────────────────────────────────────────

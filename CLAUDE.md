@@ -61,6 +61,8 @@ pip install -e ".[dev]"   # or: uv pip install -e ".[dev]"
 KUDOSY_DATA_DIR=./data KUDOSY_PORT=8080 python -m kudosy
 ```
 
+On Windows: `start_kudosy.bat` (activates `.venv`, runs `python -X utf8 -m kudosy`).
+
 ### Tests (TDD — write tests first, then implementation)
 
 ```bash
@@ -68,6 +70,12 @@ pytest                            # run all tests
 pytest tests/unit/                # pure functions only (fast)
 pytest --cov=kudosy --cov-report=term-missing   # with coverage
 ```
+
+**Windows caveats (pre-existing, not yet fixed):** run pytest as `python -X utf8 -m pytest`;
+without UTF-8 mode `tests/unit/test_feed_parse.py` cannot read its fixture (`UnicodeDecodeError`
+under the cp1252 default). API tests (`tests/api/`) also report teardown `PermissionError`
+(WinError 32) because the `last-run.log` handler keeps the file open while pytest deletes the temp
+dir; the test bodies themselves pass. CI (Linux) is unaffected.
 
 Coverage targets: ≥85% overall, ≥90% for pure modules (`parsers`, `effective_config`,
 `decision`, `humanizer`). Both are enforced in CI — the overall gate via `pytest
@@ -158,7 +166,7 @@ docker compose up --build   # builds image, starts on :8080
 | Module | Responsibility |
 |---|---|
 | `parsers.py` | Pure: `parse_athlete_name`, `decode_html_entities`, `parse_strava_cookies` (full `Cookie` header / pairs / bare value → whitelisted Strava cookies) |
-| `stat_parse.py` | Pure: `strip_unit_markup`, `parse_distance`, `parse_duration`, `parse_pace`, `parse_elevation`, `classify_stat` — all stat string→number conversions |
+| `stat_parse.py` | Pure: `strip_unit_markup`, `parse_distance` (km/m/mi → metres, 1 mi = 1609.34 m), `parse_duration`, `parse_pace`, `parse_elevation`, `classify_stat` — all stat string→number conversions |
 | `sport_types.py` | `ALL_SPORT_TYPES` enum list, `fetch_sport_types`, `merge_sport_types` |
 | `humanizer.py` | Pure: `compute_jitter`, `compute_delay` — RNG injected for tests |
 | `models.py` | Pydantic v2: `StatValue`, `ActivityStats`, `Activity`, `UserConfig` (incl. `catchAll`), `AppSettings` (incl. `feedPaginationMode`/`feedPaginationTarget`), `Decision`, `RunResult` |

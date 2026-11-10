@@ -3,7 +3,7 @@
 
 import { $, toast, setButtonLoading, escapeHtml } from './dom.js';
 import { fetchJson } from './api.js';
-import { formatSportLabel, formatRelative } from './format.js';
+import { formatSportLabel, formatRelative, formatActivityDate } from './format.js';
 import { t } from './i18n.js';
 import { state } from './state.js';
 
@@ -142,7 +142,12 @@ export function renderFeed() {
         return `<span class="feed-stat"><strong>${label}:</strong> ${escapeHtml(s.raw)}</span>`;
       })
       .join('');
-    const statsHtml  = statsParts ? `<div class="feed-stats">${statsParts}</div>` : '';
+    const dateStr    = formatActivityDate(act.start_date);
+    const dateHtml   = dateStr
+      ? `<span class="feed-stat feed-stat-date"><strong>${t('stat.date')}:</strong> ${escapeHtml(dateStr)}</span>`
+      : '';
+    const allStats   = dateHtml + statsParts;
+    const statsHtml  = allStats ? `<div class="feed-stats">${allStats}</div>` : '';
     const sportLabel = act.sport_type ? formatSportLabel(act.sport_type) : '—';
 
     // Kudos button — only shown when kudos haven't been given yet

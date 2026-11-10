@@ -6,7 +6,7 @@ themselves are tested without any real Strava HTTP calls or scheduler.
 
 from __future__ import annotations
 
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -830,6 +830,25 @@ _CACHED_ACTIVITY = {
     },
 }
 _CACHE_TS = "2026-06-21T08:00:00+00:00"
+
+
+def test_get_feed_includes_start_date(app_client: TestClient, data_dir: Path) -> None:
+    """Each /api/feed entry exposes start_date (ISO string, or null) — the Feed UI shows it."""
+    from kudosy import store
+
+    store.write_user_config_raw({"stravaSessionCookie": "valid-cookie", "athleteId": "20000001"})
+    with_date = {**_CACHED_ACTIVITY, "start_date": "2026-06-20T07:30:00+00:00"}
+    without_date = {**_CACHED_ACTIVITY, "activity_id": "55000000002", "start_date": None}
+    store.write_activity_cache([with_date, without_date], _CACHE_TS)
+
+    resp = app_client.get("/api/feed")
+
+    assert resp.status_code == 200
+    by_id = {a["activity_id"]: a for a in resp.json()["activities"]}
+    start = by_id["55000000001"]["start_date"]
+    assert isinstance(start, str)
+    assert datetime.fromisoformat(start) == datetime(2026, 6, 20, 7, 30, tzinfo=UTC)
+    assert by_id["55000000002"]["start_date"] is None
 
 
 def test_get_feed_serves_from_cache_without_strava(app_client: TestClient, data_dir: Path) -> None:
