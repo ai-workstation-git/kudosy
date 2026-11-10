@@ -6,6 +6,7 @@ themselves are tested without any real Strava HTTP calls or scheduler.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -21,7 +22,7 @@ from kudosy.sport_types import ALL_SPORT_TYPES
 
 
 @pytest.fixture()
-def app_client(data_dir: Path) -> TestClient:
+def app_client(data_dir: Path, release_log_files: Callable[[Path], None]) -> TestClient:
     """Create a TestClient with lifespan disabled and app state pre-seeded."""
     from kudosy import store
 
@@ -66,6 +67,8 @@ def app_client(data_dir: Path) -> TestClient:
 
     with TestClient(app, raise_server_exceptions=True) as client:
         # Clear the startup log so log-endpoint tests start from a clean state
+        # Close the lifespan's FileHandler first: Windows cannot delete an open file.
+        release_log_files(data_dir)
         log_file = data_dir / "last-run.log"
         if log_file.exists():
             log_file.unlink()

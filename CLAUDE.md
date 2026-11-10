@@ -71,11 +71,12 @@ pytest tests/unit/                # pure functions only (fast)
 pytest --cov=kudosy --cov-report=term-missing   # with coverage
 ```
 
-**Windows caveats (pre-existing, not yet fixed):** run pytest as `python -X utf8 -m pytest`;
-without UTF-8 mode `tests/unit/test_feed_parse.py` cannot read its fixture (`UnicodeDecodeError`
-under the cp1252 default). API tests (`tests/api/`) also report teardown `PermissionError`
-(WinError 32) because the `last-run.log` handler keeps the file open while pytest deletes the temp
-dir; the test bodies themselves pass. CI (Linux) is unaffected.
+**Windows:** run pytest as `python -X utf8 -m pytest`; without UTF-8 mode
+`tests/unit/test_feed_parse.py` cannot read its fixture (`UnicodeDecodeError` under the cp1252
+default). Windows cannot delete an open file, so the app's `last-run.log` FileHandler must be closed
+before the log or the tmp dir is removed: the `data_dir` fixture does this on teardown
+(`close_file_log_handlers` in `tests/conftest.py`), and tests that delete the log mid-test use the
+`release_log_files` fixture first. Keep that in mind when adding fixtures that remove log files.
 
 Coverage targets: ≥85% overall, ≥90% for pure modules (`parsers`, `effective_config`,
 `decision`, `humanizer`). Both are enforced in CI — the overall gate via `pytest
