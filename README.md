@@ -56,8 +56,12 @@ KUDOSY_DATA_DIR=./data KUDOSY_PORT=8080 python -m kudosy
 ```
 
 On Windows, create the venv and install as above (activate with `.venv\Scripts\activate`), then
-start Kudosy with `start_kudosy.bat`. It activates `.venv` and runs `python -X utf8 -m kudosy`
-(UTF-8 mode avoids encoding errors with the Windows default code page).
+start Kudosy with `start_kudosy.bat` (double-click or run from any folder). It runs the project's
+`.venv` Python in UTF-8 mode (avoids encoding errors with the Windows default code page) and stores
+all data (config, cookies, settings, history, logs) in the `data` folder next to the script.
+Without `KUDOSY_DATA_DIR`, Kudosy would use `/data`, which on Windows means `\data` on the current
+drive (e.g. `C:\data`). A virtual environment cannot be moved: if you move the project folder,
+recreate `.venv`.
 
 ## Getting Your Strava Cookies
 

@@ -61,7 +61,9 @@ pip install -e ".[dev]"   # or: uv pip install -e ".[dev]"
 KUDOSY_DATA_DIR=./data KUDOSY_PORT=8080 python -m kudosy
 ```
 
-On Windows: `start_kudosy.bat` (activates `.venv`, runs `python -X utf8 -m kudosy`).
+On Windows: `start_kudosy.bat` runs `%~dp0.venv\Scripts\python.exe -X utf8 -m kudosy` with
+`KUDOSY_DATA_DIR=%~dp0data` (the project's `data/` folder, git-ignored), so it works from any
+folder. Without that variable the default `/data` resolves to `\data` on the current drive.
 
 ### Tests (TDD — write tests first, then implementation)
 
