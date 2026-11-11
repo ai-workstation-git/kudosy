@@ -287,6 +287,25 @@ panel and banner show the reason (`AUTH_SESSION_EXPIRED`, `AUTH_REMEMBER_EXPIRED
 
 ## Git Conventions
 
+### Fork setup (this checkout)
+
+This checkout is a personal fork. Remotes:
+
+- `origin` = `https://github.com/bin101/kudosy.git`, the original upstream project. **Never push
+  to `origin`** and never open PRs against `bin101/kudosy`; changes stay in the fork.
+- `fork` = `https://github.com/ai-workstation-git/kudosy.git`, the user's fork. Push feature
+  branches here and merge into the fork's `main` (fast-forward, `git push fork <branch>:main`)
+  when the user asks.
+
+Local `main` still tracks `origin/main`, so a plain `git push` from it would target upstream:
+always name the remote explicitly. To pull in upstream changes, fetch `origin` and merge
+`origin/main` into a branch, then push that branch to `fork`. When opening a PR (GitHub web UI or
+`gh pr create --repo ai-workstation-git/kudosy --base main`), make sure the base repository is the
+fork; GitHub defaults fork PRs to the upstream repo. The upstream-specific notes below (GPG
+signing, release-please, GHCR image) describe the original project and may not apply to the fork:
+this machine has no `commit.gpgsign` and no `gh` CLI. Commits here use the repo-local identity
+`AI Workstation <ai-workstation@hotmail.com>`.
+
 > **GPG signing gotcha:** this repo's commits are GPG-signed (`commit.gpgsign=true`
 > locally). Never wrap `git commit` in `timeout ...`, `bash -c "..."`, or other
 > subshell/process-wrapping constructs — pinentry loses its controlling TTY in that
