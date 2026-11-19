@@ -175,7 +175,7 @@ docker compose up --build   # builds image, starts on :8080
 | `models.py` | Pydantic v2: `StatValue`, `ActivityStats`, `Activity`, `UserConfig` (incl. `catchAll`), `AppSettings` (incl. `feedPaginationMode`/`feedPaginationTarget`), `Decision`, `RunResult` |
 | `effective_config.py` | Pure: `build_effective_config(user)` — two-layer merge (catchAll → user per-sport) |
 | `decision.py` | Pure: `decide(activity, effective_config) -> Decision` — reads typed `ActivityStats` fields directly; an active minDistance/minTime rule with no such value → skip (`STAT_MISSING`) |
-| `feed.py` | `FeedParser` protocol + `StructuredFeedParser` — parses JSON XHR feed response into `list[Activity]` |
+| `feed.py` | `FeedParser` protocol + `StructuredFeedParser` — parses JSON XHR feed response into `list[Activity]`; handles `Activity` entries and `GroupActivity` members (`rowData.activities`, snake_case keys; own group members skipped; de-duplicated by id) |
 | `strava_client.py` | httpx async (real cookie jar, `current_cookies()` exposes `Set-Cookie` rotations): dashboard `__NEXT_DATA__` as source for CSRF token, athlete ID and feed page 1 plus multi-source CSRF fallbacks (see Brittleness note), JSON feed fetch (`/dashboard/feed` XHR for pages 2+), kudo POST, athlete lookup, name search, `fetch_current_athlete_id` |
 | `engine.py` | Orchestrator: run-kudos loop with delays, dry-run, RunResult |
 | `notify.py` | Pure: `send_notification(url, payload, *, post_fn)` — HTTP POST injected for tests; `build_run_payload`, `build_auth_error_payload` |
@@ -232,6 +232,8 @@ which dry runs and Feed-tab refreshes also overwrite. `untilKnown` stops after t
 per page plus the stop reason (`target reached`, `known activity reached (+1 safety page)`, `feed end`, `page cap`, `feed error`). Pacing constants
 (`_FEED_FIRST_PAGE_DELAY_RANGE` 1-3 s, `_FEED_PAGE_DELAY_RANGE` 2-6 s, long "reading" pause 8-15 s with p=0.15 replacing the normal pause, at most
 one per 4 pauses) have no UI knob.
+Feed entry types: `Activity` and `GroupActivity` (activities done together, ONE entry whose member activities are in `rowData.activities` with snake_case keys; kudos state preferably from the entry-level `kudosAndComments[<id>]`; members with `owned_by_current_athlete` are skipped). Everything else (Challenge, Club, …) is skipped. `fetch_following_feed` counts/dedupes/detects known ids per activity id via `_entry_activity_ids` (group members included); a group entry is kept if it has at least one unseen id, and `StructuredFeedParser` de-duplicates the rest.
+
 Feed pagination (verified 2026-10-29 via HAR): the embedded dashboard page reports `hasMore=false`
 although more exist, so it is never trusted — at least one XHR page is always tried and only XHR
 `hasMore` counts. XHR params: `before=int(min(cursorData.updated_at))` over all entries collected so far,

@@ -471,3 +471,127 @@ class TestRealFixture:
         """Every activity should have at least one display stat."""
         for a in real_fixture_parsed:
             assert len(a.stats.display) > 0, f"No display stats for {a.activity_id}"
+
+
+# ── GroupActivity ─────────────────────────────────────────────────────────────
+
+
+def _group_payload() -> dict:
+    return json.loads((_FIXTURES / "feed_group_activity.json").read_text(encoding="utf-8"))
+
+
+class TestGroupActivity:
+    def test_members_parsed_and_owned_skipped(self) -> None:
+        result = _parser().parse(_group_payload())
+        assert [a.activity_id for a in result] == ["90000000001", "90000000002"]
+        first = result[0]
+        assert first.athlete_id == "80000001"
+        assert first.athlete_name == "Group Athlete 1"
+        assert first.athlete_avatar_url == "https://example.invalid/avatar/80000001.jpg"
+        assert first.sport_type == "Run"
+        assert first.activity_name == "Group Run 1"
+        assert first.has_kudoed is False
+        assert first.can_kudo is True
+        assert first.kudos_count == 20
+        assert first.device_name == "Garmin Forerunner"
+
+    def test_has_kudoed_member(self) -> None:
+        result = _parser().parse(_group_payload())
+        assert result[1].has_kudoed is True
+
+    def test_stats_and_dates(self) -> None:
+        first = _parser().parse(_group_payload())[0]
+        assert first.stats.distance_m == pytest.approx(6.08 * 1609.34)
+        assert first.stats.moving_time_s == 54 * 60 + 30
+        assert first.stats.elapsed_time_s == 3359
+        assert first.start_date is not None
+        assert first.start_date.tzinfo is not None
+        assert first.location == "Testville"
+
+    def test_mixed_payload(self) -> None:
+        normal = _make_payload([_activity(id="555")])["entries"]
+        payload = _group_payload()
+        payload["entries"] = normal + payload["entries"]
+        ids = [a.activity_id for a in _parser().parse(payload)]
+        assert ids == ["555", "90000000001", "90000000002"]
+
+    def test_malformed_member_does_not_drop_others(self) -> None:
+        payload = _group_payload()
+        members = payload["entries"][0]["rowData"]["activities"]
+        members.insert(0, "not-a-dict")
+        members.insert(1, {"name": "no ids"})
+        members.insert(2, {"activity_id_str": "777", "elapsed_time": "bad"})
+        ids = [a.activity_id for a in _parser().parse(payload)]
+        assert ids == ["90000000001", "90000000002"]
+
+    def test_duplicate_id_across_entries_returned_once(self) -> None:
+        normal = _make_payload([_activity(id="90000000002", activityName="Normal")])["entries"]
+        payload = _group_payload()
+        payload["entries"] = normal + payload["entries"]
+        result = _parser().parse(payload)
+        assert [a.activity_id for a in result] == ["90000000002", "90000000001"]
+        assert result[0].activity_name == "Normal"
+
+    def test_member_level_kudos_fields_when_entry_level_missing(self) -> None:
+        payload = _group_payload()
+        del payload["entries"][0]["kudosAndComments"]
+        result = _parser().parse(payload)
+        assert result[0].kudos_count == 20
+        assert result[0].can_kudo is True
+        assert result[1].has_kudoed is True
+        assert result[1].kudos_count == 8
+
+    def test_entry_level_kudos_fields_win_over_member_fields(self) -> None:
+        payload = _group_payload()
+        member = payload["entries"][0]["rowData"]["activities"][0]
+        member["has_kudoed"] = True
+        member["can_kudo"] = False
+        member["kudos_count"] = 999
+        result = _parser().parse(payload)
+        assert result[0].activity_id == "90000000001"
+        assert result[0].has_kudoed is False
+        assert result[0].can_kudo is True
+        assert result[0].kudos_count == 20
+
+    def test_id_fallbacks_and_location_fallback(self) -> None:
+        payload = _group_payload()
+        entry = payload["entries"][0]
+        member = {
+            "entity_id_str": "4242",
+            "name": "A\nB ",
+            "activity_class_name": "Ride",
+            "athlete_id": 12,
+            "stats": [],
+        }
+        entry["rowData"]["activities"] = [member, {"activity_id": 99, "name": "x"}]
+        result = _parser().parse(payload)
+        assert [a.activity_id for a in result] == ["4242", "99"]
+        assert result[0].activity_name == "A B"
+        assert result[0].sport_type == "Ride"
+        assert result[0].athlete_id == "12"
+        assert result[0].athlete_name == "Unknown"
+        assert result[0].location == "Testville"
+
+    def test_unclassified_stats_warn(self, caplog: pytest.LogCaptureFixture) -> None:
+        payload = _group_payload()
+        payload["entries"][0]["rowData"]["activities"] = [
+            {
+                "activity_id_str": "5",
+                "stats": [
+                    {"key": "stat_one", "value": "1"},
+                    {"key": "stat_one_subtitle", "value": "Zzz"},
+                ],
+            }
+        ]
+        with caplog.at_level("WARNING"):
+            _parser().parse(payload)
+        assert "none classified" in caplog.text
+
+    def test_missing_or_bad_row_data_is_skipped(self) -> None:
+        payload = {
+            "entries": [
+                {"entity": "GroupActivity"},
+                {"entity": "GroupActivity", "rowData": {"activities": "x"}},
+            ]
+        }
+        assert _parser().parse(payload) == []

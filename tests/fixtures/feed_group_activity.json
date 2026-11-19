@@ -1,0 +1,259 @@
+{
+  "_comment": "Anonymised GroupActivity feed entry captured 2026-11-19. IDs, names, URLs and places are fake; sport type, stats, timings and kudos fields are real (member 2 marked kudoed and member 3 owned by the viewer synthetically).",
+  "entries": [
+    {
+      "entity": "GroupActivity",
+      "feedType": "following",
+      "index": 5,
+      "page": 1,
+      "locale": "en",
+      "cursorData": {
+        "updated_at": 1795033438,
+        "rank": 1795070902352
+      },
+      "viewingAthlete": {
+        "id": "10000001",
+        "name": "Viewing Athlete",
+        "avatarUrl": "https://example.invalid/avatar/10000001.jpg",
+        "memberType": "free"
+      },
+      "timeAndLocation": {
+        "timestampFormat": "date_at_time",
+        "displayDateAtTime": "Yesterday",
+        "displayDate": "Yesterday",
+        "location": "Testville"
+      },
+      "kudosAndComments": {
+        "90000000001": {
+          "canKudo": true,
+          "hasKudoed": false,
+          "highlightedKudosers": [],
+          "kudosCount": 20,
+          "commentsEnabled": true,
+          "comments": []
+        },
+        "90000000002": {
+          "canKudo": true,
+          "hasKudoed": true,
+          "highlightedKudosers": [],
+          "kudosCount": 8,
+          "commentsEnabled": true,
+          "comments": []
+        },
+        "90000000003": {
+          "canKudo": false,
+          "hasKudoed": false,
+          "highlightedKudosers": [],
+          "kudosCount": 11,
+          "commentsEnabled": true,
+          "comments": []
+        }
+      },
+      "photos": {
+        "90000000001": [],
+        "90000000002": [],
+        "90000000003": []
+      },
+      "rowData": {
+        "template_name": "group_activity",
+        "entity": "GroupActivity",
+        "feed_entry_type": 2,
+        "updated_at": "2026-11-18T20:23:58+00:00",
+        "rank": 1795070902352,
+        "title": "Group Run",
+        "start_date_local": "2026-11-18T19:16:48Z",
+        "total_num_athletes": 3,
+        "location": "Testville",
+        "trackable_id": "group-test",
+        "activities": [
+          {
+            "entity": "Activity",
+            "activity_id": 90000000001,
+            "activity_id_str": "90000000001",
+            "entity_id": 90000000001,
+            "entity_id_str": "90000000001",
+            "athlete_id": 80000001,
+            "athlete_id_str": "80000001",
+            "athlete_name": "Group Athlete 1",
+            "athlete_firstname": "Athlete1",
+            "athlete_avatar_url": "https://example.invalid/avatar/80000001.jpg",
+            "name": "Group Run 1",
+            "type": "Run",
+            "activity_class_name": "Run",
+            "start_date": "2026-11-18T19:16:48Z",
+            "start_date_local": "2026-11-18T19:16:48Z",
+            "start_time": "7:16 PM",
+            "elapsed_time": 3359,
+            "has_kudoed": false,
+            "can_kudo": true,
+            "kudos_count": 20,
+            "owned_by_current_athlete": false,
+            "is_commute": false,
+            "is_virtual": false,
+            "device_name": "Garmin Forerunner",
+            "location": "Testville",
+            "visibility": "everyone",
+            "private": false,
+            "stats": [
+              {
+                "key": "stat_one",
+                "value": "6.08<abbr class='unit' title='miles'> mi</abbr>",
+                "value_object": null
+              },
+              {
+                "key": "stat_one_subtitle",
+                "value": "Distance",
+                "value_object": null
+              },
+              {
+                "key": "stat_two",
+                "value": "8:58<abbr class='unit' title='minutes per mile'> /mi</abbr>",
+                "value_object": null
+              },
+              {
+                "key": "stat_two_subtitle",
+                "value": "Pace",
+                "value_object": null
+              },
+              {
+                "key": "stat_three",
+                "value": "54<abbr class='unit' title='minute'>m</abbr> 30<abbr class='unit' title='second'>s</abbr>",
+                "value_object": null
+              },
+              {
+                "key": "stat_three_subtitle",
+                "value": "Time",
+                "value_object": null
+              }
+            ]
+          },
+          {
+            "entity": "Activity",
+            "activity_id": 90000000002,
+            "activity_id_str": "90000000002",
+            "entity_id": 90000000002,
+            "entity_id_str": "90000000002",
+            "athlete_id": 80000002,
+            "athlete_id_str": "80000002",
+            "athlete_name": "Group Athlete 2",
+            "athlete_firstname": "Athlete2",
+            "athlete_avatar_url": "https://example.invalid/avatar/80000002.jpg",
+            "name": "Group Run 2",
+            "type": "Run",
+            "activity_class_name": "Run",
+            "start_date": "2026-11-18T19:16:46Z",
+            "start_date_local": "2026-11-18T19:16:46Z",
+            "start_time": "7:16 PM",
+            "elapsed_time": 3363,
+            "has_kudoed": true,
+            "can_kudo": true,
+            "kudos_count": 8,
+            "owned_by_current_athlete": false,
+            "is_commute": false,
+            "is_virtual": false,
+            "device_name": "Garmin Forerunner",
+            "location": "Testville",
+            "visibility": "everyone",
+            "private": false,
+            "stats": [
+              {
+                "key": "stat_one",
+                "value": "6.10<abbr class='unit' title='miles'> mi</abbr>",
+                "value_object": null
+              },
+              {
+                "key": "stat_one_subtitle",
+                "value": "Distance",
+                "value_object": null
+              },
+              {
+                "key": "stat_two",
+                "value": "8:57<abbr class='unit' title='minutes per mile'> /mi</abbr>",
+                "value_object": null
+              },
+              {
+                "key": "stat_two_subtitle",
+                "value": "Pace",
+                "value_object": null
+              },
+              {
+                "key": "stat_three",
+                "value": "54<abbr class='unit' title='minute'>m</abbr> 33<abbr class='unit' title='second'>s</abbr>",
+                "value_object": null
+              },
+              {
+                "key": "stat_three_subtitle",
+                "value": "Time",
+                "value_object": null
+              }
+            ]
+          },
+          {
+            "entity": "Activity",
+            "activity_id": 90000000003,
+            "activity_id_str": "90000000003",
+            "entity_id": 90000000003,
+            "entity_id_str": "90000000003",
+            "athlete_id": 10000001,
+            "athlete_id_str": "10000001",
+            "athlete_name": "Viewing Athlete",
+            "athlete_firstname": "Athlete3",
+            "athlete_avatar_url": "https://example.invalid/avatar/80000003.jpg",
+            "name": "Group Run 3",
+            "type": "Run",
+            "activity_class_name": "Run",
+            "start_date": "2026-11-18T18:53:04Z",
+            "start_date_local": "2026-11-18T18:53:04Z",
+            "start_time": "6:53 PM",
+            "elapsed_time": 4782,
+            "has_kudoed": false,
+            "can_kudo": false,
+            "kudos_count": 11,
+            "owned_by_current_athlete": true,
+            "is_commute": false,
+            "is_virtual": false,
+            "device_name": "Garmin Forerunner",
+            "location": "Testville",
+            "visibility": "everyone",
+            "private": false,
+            "stats": [
+              {
+                "key": "stat_one",
+                "value": "6.18<abbr class='unit' title='miles'> mi</abbr>",
+                "value_object": null
+              },
+              {
+                "key": "stat_one_subtitle",
+                "value": "Distance",
+                "value_object": null
+              },
+              {
+                "key": "stat_two",
+                "value": "9:05<abbr class='unit' title='minutes per mile'> /mi</abbr>",
+                "value_object": null
+              },
+              {
+                "key": "stat_two_subtitle",
+                "value": "Pace",
+                "value_object": null
+              },
+              {
+                "key": "stat_three",
+                "value": "56<abbr class='unit' title='minute'>m</abbr> 11<abbr class='unit' title='second'>s</abbr>",
+                "value_object": null
+              },
+              {
+                "key": "stat_three_subtitle",
+                "value": "Time",
+                "value_object": null
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "pagination": {
+    "hasMore": true
+  }
+}

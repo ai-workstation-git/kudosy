@@ -2178,3 +2178,99 @@ async def test_later_page_failure_stop_reason_feed_error(
     await client.aclose()
     assert _ids(result) == [1]
     assert "stop reason: feed error" in caplog.text
+
+
+# ── fetch_following_feed — GroupActivity entries ─────────────────────────────
+
+
+def _group_entry(
+    member_ids: list[int], rank: float = 9000.0, updated_at: int = 1000, *, use_str: bool = True
+) -> dict:
+    return {
+        "entity": "GroupActivity",
+        "rowData": {
+            "activities": [
+                {("activity_id_str" if use_str else "activity_id"): (str(i) if use_str else i)}
+                for i in member_ids
+            ]
+        },
+        "cursorData": {"updated_at": updated_at, "rank": rank},
+    }
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_group_members_count_towards_target(caplog: pytest.LogCaptureFixture) -> None:
+    page1 = _page([_group_entry([1, 2, 3], 9000.0, 1800), _act_entry(4, 8000.0, 1700)], True)
+    page2 = _page([_act_entry(5, 7000.0, 1600)], True)
+    respx.get("https://www.strava.com/dashboard/feed").mock(
+        side_effect=[httpx.Response(200, json=page1), httpx.Response(200, json=page2)]
+    )
+    client = _client()
+    with caplog.at_level("INFO", logger="kudosy.strava_client"):
+        result = await client.fetch_following_feed("1", target=4)
+    await client.aclose()
+    assert len(respx.calls) == 1  # 3 members + 1 normal = 4 >= target
+    assert len(result["entries"]) == 2
+    assert "4 unique activities so far" in caplog.text
+    assert "stop reason: target reached" in caplog.text
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_group_entry_with_only_seen_ids_is_dropped_and_new_one_kept() -> None:
+    page1 = _page([_act_entry(1, 9000.0, 1800), _act_entry(2, 8900.0, 1790)], True)
+    page2 = _page(
+        [
+            _group_entry([1, 2], 8000.0, 1700, use_str=False),
+            _group_entry([2, 3], 7000.0, 1600),
+        ],
+        False,
+    )
+    respx.get("https://www.strava.com/dashboard/feed").mock(
+        side_effect=[httpx.Response(200, json=page1), httpx.Response(200, json=page2)]
+    )
+    client = _client()
+    result = await client.fetch_following_feed("1", target=100)
+    await client.aclose()
+    entities = [e["entity"] for e in result["entries"]]
+    assert entities == ["Activity", "Activity", "GroupActivity"]
+    assert result["entries"][2]["rowData"]["activities"][1]["activity_id_str"] == "3"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_known_id_inside_group_triggers_until_known_stop(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    pages = [
+        _page([_act_entry(1, 9000.0, 1800)], True),
+        _page([_group_entry([10, 20], 8000.0, 1700)], True),
+        _page([_act_entry(3, 7000.0, 1600)], True),
+        _page([_act_entry(4, 6000.0, 1500)], True),
+    ]
+    respx.get("https://www.strava.com/dashboard/feed").mock(
+        side_effect=[httpx.Response(200, json=p) for p in pages]
+    )
+    client = _client()
+    with caplog.at_level("INFO", logger="kudosy.strava_client"):
+        result = await client.fetch_following_feed(
+            "1", target=500, known_ids={"20"}, mode="untilKnown"
+        )
+    await client.aclose()
+    assert len(respx.calls) == 3  # group page is the known page, plus one safety page
+    assert len(result["entries"]) == 3
+    assert "stop reason: known activity reached (+1 safety page)" in caplog.text
+
+
+def test_entry_activity_ids() -> None:
+    from kudosy.strava_client import _entry_activity_ids
+
+    assert _entry_activity_ids(_act_entry(7)) == ["7"]
+    assert _entry_activity_ids(_group_entry([1, 2])) == ["1", "2"]
+    assert _entry_activity_ids(_group_entry([1], use_str=False)) == ["1"]
+    assert _entry_activity_ids({"entity": "Challenge"}) == []
+    assert _entry_activity_ids("junk") == []
+    bad = {"entity": "GroupActivity", "rowData": {"activities": ["x", {"entity_id_str": "9"}, {}]}}
+    assert _entry_activity_ids(bad) == ["9"]
+    assert _entry_activity_ids({"entity": "GroupActivity", "rowData": 5}) == []

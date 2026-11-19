@@ -16,7 +16,7 @@ Feed format (verified 2026-06-30 via HAR capture):
       {
         "entries": [
           {
-            "entity": "Activity",   # only this type is processed
+            "entity": "Activity",   # processed
             "activity": {
               "id": "12345678901",
               "activityName": "Morning Run",
@@ -34,11 +34,25 @@ Feed format (verified 2026-06-30 via HAR capture):
               ]
             }
           },
+          {
+            "entity": "GroupActivity",   # activities done together: ONE entry, many members
+            "kudosAndComments": {"<activity id>": {"hasKudoed": …, "canKudo": …, "kudosCount": …}},
+            "timeAndLocation": {"location": "…"},
+            "rowData": {"activities": [<member>, …]}
+          },
           {"entity": "Challenge", …},   # skipped
           {"entity": "AthleteFeedEntry", …},  # skipped
         ],
         "pagination": {"hasMore": true}
       }
+
+  GroupActivity members (``rowData.activities``) use snake_case keys, unlike normal
+  activities: ``activity_id(_str)``, ``entity_id_str``, ``athlete_id(_str)``,
+  ``athlete_name``, ``athlete_avatar_url``, ``name``, ``type`` / ``activity_class_name``,
+  ``start_date``, ``elapsed_time``, ``has_kudoed``, ``can_kudo``, ``kudos_count``,
+  ``owned_by_current_athlete``, ``is_commute``, ``is_virtual``, ``device_name``,
+  ``location`` and ``stats`` (same shape as normal activities). The viewer's own
+  members (``owned_by_current_athlete``) are skipped.
 """
 
 from __future__ import annotations
@@ -86,8 +100,10 @@ class StructuredFeedParser:
     Accepts the decoded JSON dict (``{"entries": […], "pagination": {…}}``) and
     returns a normalised ``list[Activity]`` with typed ``ActivityStats``.
 
-    Only ``entity == "Activity"`` entries are processed; ``Challenge``,
-    ``AthleteFeedEntry`` and any other types are silently skipped.
+    ``entity == "Activity"`` entries and the member activities of
+    ``entity == "GroupActivity"`` entries are processed (group members owned by the
+    viewer are skipped); ``Challenge``, ``AthleteFeedEntry`` and any other types are silently
+    skipped. Activities are de-duplicated by ID across the payload (first one wins).
     """
 
     def parse(self, payload: dict[str, Any]) -> list[Activity]:
@@ -105,22 +121,47 @@ class StructuredFeedParser:
             return []
 
         results: list[Activity] = []
+        seen_ids: set[str] = set()
+
+        def add(act: Activity | None) -> None:
+            if act is not None and act.activity_id not in seen_ids:
+                seen_ids.add(act.activity_id)
+                results.append(act)
+
         for entry in entries:
-            try:
-                if not isinstance(entry, dict) or entry.get("entity") != "Activity":
+            if not isinstance(entry, dict):
+                continue
+            entity = entry.get("entity")
+            if entity == "Activity":
+                try:
+                    act_data = entry.get("activity")
+                    if isinstance(act_data, dict):
+                        add(self._parse_activity(act_data))
+                except Exception:
+                    log.warning(
+                        "StructuredFeedParser: failed to parse entry %r",
+                        str(entry)[:200],
+                        exc_info=True,
+                    )
+            elif entity == "GroupActivity":
+                row_data = entry.get("rowData")
+                members = row_data.get("activities") if isinstance(row_data, dict) else None
+                if not isinstance(members, list):
                     continue
-                act_data = entry.get("activity")
-                if not isinstance(act_data, dict):
-                    continue
-                act = self._parse_activity(act_data)
-                if act is not None:
-                    results.append(act)
-            except Exception:
-                log.warning(
-                    "StructuredFeedParser: failed to parse entry %r",
-                    str(entry)[:200],
-                    exc_info=True,
-                )
+                for member in members:
+                    try:
+                        if not isinstance(member, dict):
+                            continue
+                        if member.get("owned_by_current_athlete"):
+                            log.debug("Skipping own activity inside a group entry")
+                            continue
+                        add(self._parse_group_member(member, entry))
+                    except Exception:
+                        log.warning(
+                            "StructuredFeedParser: failed to parse group member %r",
+                            str(member)[:200],
+                            exc_info=True,
+                        )
 
         log.debug(
             "StructuredFeedParser: parsed %d activities from %d entries",
@@ -166,18 +207,9 @@ class StructuredFeedParser:
         is_virtual = bool(data.get("isVirtual"))
         device_name: str | None = data.get("deviceName") or None
 
-        stats = self._parse_stats(data.get("stats") or [], elapsed_time_s=elapsed_time_s)
-        if stats.display and all(sv.key == "unknown" for sv in stats.display):
-            # Every stat item was present but none matched a known label — a
-            # strong signal that Strava changed its label format (localisation,
-            # rename) rather than this particular activity being unusual.
-            log.warning(
-                "Activity %s (%s): %d stat(s) present but none classified — "
-                "Strava's stat label format may have changed",
-                activity_id,
-                sport_type or "unknown sport",
-                len(stats.display),
-            )
+        stats = self._stats_with_warning(
+            data.get("stats") or [], elapsed_time_s, activity_id, sport_type
+        )
 
         return Activity(
             activity_id=activity_id,
@@ -196,6 +228,90 @@ class StructuredFeedParser:
             device_name=device_name,
             stats=stats,
         )
+
+    def _parse_group_member(self, member: dict[str, Any], entry: dict[str, Any]) -> Activity | None:
+        """Parse one member of a ``GroupActivity`` entry (snake_case keys)."""
+        activity_id = ""
+        for key in ("activity_id_str", "activity_id", "entity_id_str"):
+            activity_id = str(member.get(key) or "").strip()
+            if activity_id:
+                break
+        if not activity_id:
+            return None
+
+        activity_name = str(member.get("name") or "").replace("\n", " ").strip()
+        sport_type = str(member.get("type") or member.get("activity_class_name") or "")
+        athlete_id = str(member.get("athlete_id_str") or member.get("athlete_id") or "")
+        athlete_name = str(member.get("athlete_name") or "Unknown")
+        athlete_avatar_url: str | None = member.get("athlete_avatar_url") or None
+
+        all_kudos = entry.get("kudosAndComments")
+        kk = all_kudos.get(activity_id) if isinstance(all_kudos, dict) else None
+        if isinstance(kk, dict):
+            has_kudoed = bool(kk.get("hasKudoed"))
+            can_kudo = bool(kk.get("canKudo", True))
+            kudos_count = int(kk.get("kudosCount") or 0)
+        else:
+            has_kudoed = bool(member.get("has_kudoed"))
+            can_kudo = bool(member.get("can_kudo", True))
+            kudos_count = int(member.get("kudos_count") or 0)
+
+        tl = entry.get("timeAndLocation")
+        entry_location = tl.get("location") if isinstance(tl, dict) else None
+        location: str | None = member.get("location") or entry_location or None
+
+        start_date: datetime | None = None
+        raw_date = member.get("start_date")
+        if raw_date:
+            with contextlib.suppress(ValueError):
+                start_date = datetime.fromisoformat(str(raw_date).replace("Z", "+00:00"))
+
+        elapsed_raw = member.get("elapsed_time")
+        elapsed_time_s: int | None = int(elapsed_raw) if elapsed_raw is not None else None
+
+        stats = self._stats_with_warning(
+            member.get("stats") or [], elapsed_time_s, activity_id, sport_type
+        )
+
+        return Activity(
+            activity_id=activity_id,
+            activity_name=activity_name,
+            sport_type=sport_type,
+            athlete_id=athlete_id,
+            athlete_name=athlete_name,
+            athlete_avatar_url=athlete_avatar_url,
+            has_kudoed=has_kudoed,
+            can_kudo=can_kudo,
+            kudos_count=kudos_count,
+            start_date=start_date,
+            location=location,
+            is_commute=bool(member.get("is_commute")),
+            is_virtual=bool(member.get("is_virtual")),
+            device_name=member.get("device_name") or None,
+            stats=stats,
+        )
+
+    def _stats_with_warning(
+        self,
+        raw_stats: list[Any],
+        elapsed_time_s: int | None,
+        activity_id: str,
+        sport_type: str,
+    ) -> ActivityStats:
+        """Parse stats; warn when stats exist but none could be classified."""
+        stats = self._parse_stats(raw_stats, elapsed_time_s=elapsed_time_s)
+        if stats.display and all(sv.key == "unknown" for sv in stats.display):
+            # Every stat item was present but none matched a known label — a
+            # strong signal that Strava changed its label format (localisation,
+            # rename) rather than this particular activity being unusual.
+            log.warning(
+                "Activity %s (%s): %d stat(s) present but none classified — "
+                "Strava's stat label format may have changed",
+                activity_id,
+                sport_type or "unknown sport",
+                len(stats.display),
+            )
+        return stats
 
     def _parse_stats(
         self,

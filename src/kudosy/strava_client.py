@@ -98,6 +98,39 @@ _FEED_LONG_PAUSE_PROBABILITY = 0.15
 _FEED_LONG_PAUSE_MIN_GAP = 4  # at most one long pause per this many pauses
 
 
+def _entry_activity_ids(entry: Any) -> list[str]:
+    """Return the activity IDs of a feed entry (normal ``Activity`` or ``GroupActivity``).
+
+    A normal entry has one ID (``entry["activity"]["id"]``); a group entry has one per
+    member in ``rowData.activities`` (same ID precedence as the feed parser:
+    ``activity_id_str``, ``activity_id``, ``entity_id_str``). Other entries yield ``[]``.
+    Group members owned by the viewer are counted here although the parser drops them,
+    so the unique count can exceed the parsed activities by at most one per group.
+    """
+    if not isinstance(entry, dict):
+        return []
+    act = entry.get("activity")
+    if isinstance(act, dict):
+        raw_id = act.get("id")
+        return [str(raw_id)] if raw_id is not None else []
+    if entry.get("entity") != "GroupActivity":
+        return []
+    row_data = entry.get("rowData")
+    members = row_data.get("activities") if isinstance(row_data, dict) else None
+    if not isinstance(members, list):
+        return []
+    ids: list[str] = []
+    for member in members:
+        if not isinstance(member, dict):
+            continue
+        for key in ("activity_id_str", "activity_id", "entity_id_str"):
+            raw = str(member.get(key) or "").strip()
+            if raw:
+                ids.append(raw)
+                break
+    return ids
+
+
 def _feed_page_cap(target: int) -> int:
     """Hard page cap derived from the target, so large targets stay reachable."""
     return min(_FEED_PAGE_CAP_LIMIT, -(-target // _FEED_ACTIVITIES_PER_PAGE) + 2)
@@ -563,16 +596,14 @@ class StravaClient:
 
             page_has_known = False
             for entry in entries:
-                act = entry.get("activity") if isinstance(entry, dict) else None
                 # Page 1 (embedded JSON) and pages 2+ (XHR) may type the same ID differently.
-                raw_id = act.get("id") if isinstance(act, dict) else None
-                aid = str(raw_id) if raw_id is not None else None
-                if aid is not None and aid in seen_activity_ids:
+                ids = _entry_activity_ids(entry)
+                new_ids = [i for i in ids if i not in seen_activity_ids]
+                if ids and not new_ids:
                     continue
-                if aid is not None:
-                    seen_activity_ids.add(aid)
-                    if known_ids and aid in known_ids:
-                        page_has_known = True
+                seen_activity_ids.update(new_ids)
+                if known_ids and any(aid in known_ids for aid in new_ids):
+                    page_has_known = True
                 merged_entries.append(entry)
 
             log.info(
