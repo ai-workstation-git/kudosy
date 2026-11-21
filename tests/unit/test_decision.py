@@ -1,11 +1,13 @@
 """Unit tests for decision.py — pure filter logic.
 
 Decision precedence (highest → lowest):
-  ignore → already → allow → name_match → no_rule (gating) → criteria / stat_missing
-  → default (give kudos)
+  own → ignore → already → cannot_kudo → allow → name_match → no_rule (gating)
+  → criteria / stat_missing → default (give kudos)
 
 Test corpus is derived from the real last-run.log to guarantee behavioral parity.
 """
+
+import pytest
 
 from kudosy.decision import decide
 from kudosy.effective_config import build_effective_config
@@ -428,3 +430,62 @@ class TestAllowList:
         d = decide(act, eff)  # type: ignore[arg-type]
         assert d.give_kudos is True
         assert d.reason == DecisionReason.ALLOW
+
+
+class TestOwnActivity:
+    """The logged-in athlete's own activity is never kudoed (highest precedence)."""
+
+    def test_own_activity_skipped(self) -> None:
+        d = decide(_act(athlete_id="123"), _eff(catch_min_dist=1), own_athlete_id="123")  # type: ignore[arg-type]
+        assert (d.give_kudos, d.reason) == (False, DecisionReason.OWN)
+
+    def test_own_beats_allow_list(self) -> None:
+        eff = _eff(allow=["123"], catch_min_dist=1)
+        d = decide(_act(athlete_id="123"), eff, own_athlete_id="123")  # type: ignore[arg-type]
+        assert d.reason == DecisionReason.OWN
+
+    def test_own_beats_name_match_and_ignore(self) -> None:
+        eff = _eff(names=["Ride"], ignore=["123"])
+        d = decide(_act(athlete_id="123"), eff, own_athlete_id="123")  # type: ignore[arg-type]
+        assert d.reason == DecisionReason.OWN
+
+    def test_own_beats_already(self) -> None:
+        d = decide(_act(athlete_id="123", has_kudoed=True), _eff(), own_athlete_id="123")  # type: ignore[arg-type]
+        assert d.reason == DecisionReason.OWN
+
+    @pytest.mark.parametrize("own", [None, "", "  "])
+    def test_empty_own_id_disables_check(self, own: str | None) -> None:
+        eff = _eff(allow=["123"])
+        d = decide(_act(athlete_id="123"), eff, own_athlete_id=own)  # type: ignore[arg-type]
+        assert d.reason == DecisionReason.ALLOW
+
+    def test_own_id_is_stripped(self) -> None:
+        d = decide(_act(athlete_id="123"), _eff(), own_athlete_id=" 123 ")  # type: ignore[arg-type]
+        assert d.reason == DecisionReason.OWN
+
+    def test_other_athlete_unaffected(self) -> None:
+        eff = _eff(allow=["111"])
+        d = decide(_act(athlete_id="111"), eff, own_athlete_id="123")  # type: ignore[arg-type]
+        assert d.reason == DecisionReason.ALLOW
+
+
+class TestCannotKudo:
+    """Strava canKudo=false → skip, overriding allow list and name match."""
+
+    def test_cannot_kudo_skipped(self) -> None:
+        act = _act(distance_m=20000).model_copy(update={"can_kudo": False})
+        d = decide(act, _eff(catch_min_dist=1))  # type: ignore[arg-type]
+        assert (d.give_kudos, d.reason) == (False, DecisionReason.CANNOT_KUDO)
+
+    def test_cannot_kudo_beats_allow_and_name_match(self) -> None:
+        act = _act(athlete_id="111").model_copy(update={"can_kudo": False})
+        assert decide(act, _eff(allow=["111"])).reason == DecisionReason.CANNOT_KUDO  # type: ignore[arg-type]
+        assert decide(act, _eff(names=["Ride"])).reason == DecisionReason.CANNOT_KUDO  # type: ignore[arg-type]
+
+    def test_already_kudoed_keeps_already(self) -> None:
+        act = _act(has_kudoed=True).model_copy(update={"can_kudo": False})
+        assert decide(act, _eff()).reason == DecisionReason.ALREADY  # type: ignore[arg-type]
+
+    def test_can_kudo_true_unaffected(self) -> None:
+        d = decide(_act(distance_m=20000), _eff(catch_min_dist=1))  # type: ignore[arg-type]
+        assert d.reason == DecisionReason.DEFAULT

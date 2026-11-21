@@ -15,7 +15,7 @@ from kudosy.models import Activity, ActivityStats, AppSettings, CatchAll, UserCo
 def _act(activity_id: str = "10000000001", *, distance_m: float | None = 10000.0) -> Activity:
     return Activity(
         activity_id=activity_id,
-        athlete_id="20000001",
+        athlete_id="30000001",
         athlete_name="Alex Runner",
         activity_name="Morning Run",
         sport_type="Run",
@@ -162,3 +162,29 @@ async def test_no_distance_warning_for_empty_or_statless_feed(
     with caplog.at_level("WARNING"):
         await run_kudos(_cfg(), _FAST, client=_client(), feed_parser=_Parser([bare]), dry_run=True)
     assert "no parsable distance" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_own_activity_is_not_kudoed() -> None:
+    own = _act("10000000009").model_copy(update={"athlete_id": "20000001"})
+    other = _act("10000000010").model_copy(update={"athlete_id": "20000002"})
+    client = _client()
+    await run_kudos(
+        _cfg("20000001"),
+        _FAST,
+        client=client,
+        feed_parser=_Parser([own, other]),
+        rng=random.Random(0),
+    )
+    sent = [c.args[0] for c in client.send_kudos.call_args_list]
+    assert sent == ["10000000010"]
+
+
+@pytest.mark.asyncio
+async def test_cannot_kudo_activity_is_not_kudoed() -> None:
+    blocked = _act("10000000011").model_copy(update={"can_kudo": False})
+    client = _client()
+    await run_kudos(
+        _cfg(), _FAST, client=client, feed_parser=_Parser([blocked]), rng=random.Random(0)
+    )
+    client.send_kudos.assert_not_called()

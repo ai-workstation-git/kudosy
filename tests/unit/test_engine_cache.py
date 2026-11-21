@@ -22,7 +22,7 @@ def make_activity(
 ) -> Activity:
     return Activity(
         activity_id=activity_id,
-        athlete_id="20000001",
+        athlete_id="30000001",
         athlete_name=athlete_name,
         activity_name="Morning Run",
         sport_type="Run",
@@ -199,7 +199,7 @@ async def test_activities_in_result_are_json_serializable() -> None:
     """
     act = Activity(
         activity_id="date-001",
-        athlete_id="20000001",
+        athlete_id="30000001",
         athlete_name="Alex Runner",
         activity_name="Morning Run",
         sport_type="Run",

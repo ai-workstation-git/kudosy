@@ -112,6 +112,9 @@ def test_no_language_has_a_blank_translation(i18n: dict[str, Any]) -> None:
 
 _NEW_KEYS = (
     "reason.stat_missing",
+    "reason.own",
+    "reason.cannot_kudo",
+    "error.OWN_ACTIVITY",
     "toast.kudo.failed",
     "toast.kudo.failedWith",
     "status.lastError",

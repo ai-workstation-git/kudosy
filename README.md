@@ -134,6 +134,15 @@ environment variables:
 Leaving `KUDOSY_AUTH_PASSWORD` unset keeps today's behavior (no login) — this is opt-in and
 does not affect existing installs.
 
+## Own Activities and Activities Strava Does Not Allow Kudos For
+
+Kudosy never tries to give kudos to your own activities (reason "own activity" in the Feed tab),
+not even if your own ID is on the allow list. Likewise, activities that Strava itself marks as not
+kudo-able (`canKudo: false`; reason "kudos not possible") are skipped, regardless of allow list or
+name patterns. Both checks rank above all other rules. The own-activity check needs your athlete ID
+(set in the configuration, or resolved from Strava during runs and Feed-tab refreshes; without a
+configured ID, cached Feed views fall back to the "kudos not possible" check).
+
 ## Rules and Missing Values
 
 A minimum-distance or minimum-duration rule is only checked against values Strava actually

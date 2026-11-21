@@ -174,7 +174,7 @@ docker compose up --build   # builds image, starts on :8080
 | `humanizer.py` | Pure: `compute_jitter`, `compute_delay` — RNG injected for tests |
 | `models.py` | Pydantic v2: `StatValue`, `ActivityStats`, `Activity`, `UserConfig` (incl. `catchAll`), `AppSettings` (incl. `feedPaginationMode`/`feedPaginationTarget`), `Decision`, `RunResult` |
 | `effective_config.py` | Pure: `build_effective_config(user)` — two-layer merge (catchAll → user per-sport) |
-| `decision.py` | Pure: `decide(activity, effective_config) -> Decision` — reads typed `ActivityStats` fields directly; an active minDistance/minTime rule with no such value → skip (`STAT_MISSING`) |
+| `decision.py` | Pure: `decide(activity, effective_config, *, own_athlete_id=None) -> Decision` — precedence: own activity (`OWN`, skip even if allow-listed; empty id disables) → ignore → already → `can_kudo` False (`CANNOT_KUDO`) → allow → name match → rules; — reads typed `ActivityStats` fields directly; an active minDistance/minTime rule with no such value → skip (`STAT_MISSING`) |
 | `feed.py` | `FeedParser` protocol + `StructuredFeedParser` — parses JSON XHR feed response into `list[Activity]`; handles `Activity` entries and `GroupActivity` members (`rowData.activities`, snake_case keys; own group members skipped; de-duplicated by id) |
 | `strava_client.py` | httpx async (real cookie jar, `current_cookies()` exposes `Set-Cookie` rotations): dashboard `__NEXT_DATA__` as source for CSRF token, athlete ID and feed page 1 plus multi-source CSRF fallbacks (see Brittleness note), JSON feed fetch (`/dashboard/feed` XHR for pages 2+), kudo POST, athlete lookup, name search, `fetch_current_athlete_id` |
 | `engine.py` | Orchestrator: run-kudos loop with delays, dry-run, RunResult |

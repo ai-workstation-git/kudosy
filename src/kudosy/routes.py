@@ -585,7 +585,9 @@ async def get_status(request: Request) -> dict[str, Any]:
 # ── Feed ──────────────────────────────────────────────────────────────────────
 
 
-def _decorate_feed(raw_acts: list[dict[str, Any]], effective: Any) -> list[dict[str, Any]]:
+def _decorate_feed(
+    raw_acts: list[dict[str, Any]], effective: Any, own_athlete_id: str | None = None
+) -> list[dict[str, Any]]:
     """Re-compute engine decisions over raw Activity dicts and return decorated entries.
 
     Decisions are never persisted — they are always recomputed from the current
@@ -599,7 +601,7 @@ def _decorate_feed(raw_acts: list[dict[str, Any]], effective: Any) -> list[dict[
         except Exception:
             log.debug("_decorate_feed: skipping invalid activity entry: %s", raw)
             continue
-        decision = decide(act, effective)
+        decision = decide(act, effective, own_athlete_id=own_athlete_id)
         entry = act.model_dump()
         entry["give_kudos"] = decision.give_kudos
         entry["reason"] = str(decision.reason)
@@ -630,7 +632,10 @@ async def get_feed(request: Request) -> dict[str, Any]:
         cached_acts, fetched_at = read_activity_cache()
         if fetched_at is not None:
             log.debug("Serving feed from activity cache (%d entries)", len(cached_acts))
-            return {"fetched_at": fetched_at, "activities": _decorate_feed(cached_acts, effective)}
+            return {
+                "fetched_at": fetched_at,
+                "activities": _decorate_feed(cached_acts, effective, cfg.athleteId),
+            }
 
     # Live fetch (explicit refresh or empty cache / first boot).
     import contextlib
@@ -678,7 +683,7 @@ async def get_feed(request: Request) -> dict[str, Any]:
             # An empty result is more likely a parse problem than an empty feed:
             # keep the last good snapshot instead of overwriting it.
             log.warning("Live feed returned no activities — activity cache left unchanged")
-        return {"fetched_at": now_ts, "activities": _decorate_feed(raw_acts, effective)}
+        return {"fetched_at": now_ts, "activities": _decorate_feed(raw_acts, effective, athlete_id)}
     except AuthError as exc:
         code = getattr(exc, "code", "AUTH_FAILED")
         raise HTTPException(status_code=401, detail={"code": code, "message": str(exc)}) from exc
@@ -720,6 +725,22 @@ async def post_single_kudos(
             status_code=400,
             detail={"code": "NO_COOKIE", "message": "Kein Session-Cookie konfiguriert"},
         )
+
+    # Refuse the user's own activity early (Strava would answer 403) when the cache knows it.
+    own_id = (cfg.athleteId or "").strip()
+    if own_id:
+        cached_acts, _ = read_activity_cache()
+        for cached in cached_acts:
+            if str(cached.get("activity_id")) == activity_id and (
+                str(cached.get("athlete_id", "")).strip() == own_id
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "OWN_ACTIVITY",
+                        "message": "Für die eigene Aktivität können keine Kudos vergeben werden.",
+                    },
+                )
 
     client = StravaClient(cfg.stravaCookies)
     try:

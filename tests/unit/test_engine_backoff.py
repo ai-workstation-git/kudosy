@@ -21,7 +21,7 @@ from kudosy.models import Activity, ActivityStats, AppSettings, CatchAll, UserCo
 def make_activity(activity_id: str) -> Activity:
     return Activity(
         activity_id=activity_id,
-        athlete_id="20000001",
+        athlete_id="30000001",
         athlete_name="Alex Runner",
         activity_name="Morning Run",
         sport_type="Run",

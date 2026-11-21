@@ -309,8 +309,12 @@ class Activity(BaseModel):
 class DecisionReason(StrEnum):
     """Why the engine decided to give or skip kudos for an activity."""
 
+    OWN = "own"  # the logged-in athlete's own activity → never kudo (highest precedence)
     IGNORE = "ignore"  # athlete in ignore list
     ALREADY = "already"  # already kudoed
+    CANNOT_KUDO = (
+        "cannot_kudo"  # Strava says canKudo=false (and not yet kudoed) → would be rejected
+    )
     ALLOW = "allow"  # athlete in allow list → always give kudos (overrides criteria)
     CRITERIA = "criteria"  # below minDistance/minTime threshold
     NAME_MATCH = "name_match"  # activity name matched a regex → always give

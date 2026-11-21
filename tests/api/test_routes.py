@@ -1606,3 +1606,46 @@ def test_get_feed_refresh_passes_settings_and_previous_snapshot_ids(
     assert seen["target"] == 60
     # The refresh may read the known set but must never write it.
     assert store.read_known_feed_ids() == {"111", "222"}
+
+
+def test_get_feed_marks_own_and_cannot_kudo(app_client: TestClient, data_dir: Path) -> None:
+    """Own activity -> reason 'own'; canKudo false -> 'cannot_kudo'; others unaffected."""
+    from kudosy import store
+
+    store.write_user_config_raw(
+        {
+            "stravaSessionCookie": "valid-cookie",
+            "athleteId": "20000001",
+            "catchAll": {"minDistance": 1},
+        }
+    )
+    own = {**_CACHED_ACTIVITY, "activity_id": "55000000010", "athlete_id": "20000001"}
+    blocked = {**_CACHED_ACTIVITY, "activity_id": "55000000011", "can_kudo": False}
+    normal = {**_CACHED_ACTIVITY, "activity_id": "55000000012"}
+    store.write_activity_cache([own, blocked, normal], _CACHE_TS)
+
+    resp = app_client.get("/api/feed")
+
+    by_id = {a["activity_id"]: a for a in resp.json()["activities"]}
+    assert by_id["55000000010"]["reason"] == "own"
+    assert by_id["55000000010"]["give_kudos"] is False
+    assert by_id["55000000011"]["reason"] == "cannot_kudo"
+    assert by_id["55000000012"]["give_kudos"] is True
+
+
+def test_post_kudos_refuses_own_activity(app_client: TestClient, data_dir: Path) -> None:
+    from unittest.mock import AsyncMock, patch
+
+    from kudosy import store
+
+    store.write_user_config_raw({"stravaSessionCookie": "valid-cookie", "athleteId": "20000001"})
+    own = {**_CACHED_ACTIVITY, "athlete_id": "20000001"}
+    store.write_activity_cache([own], _CACHE_TS)
+
+    mock_instance = AsyncMock()
+    with patch("kudosy.routes.StravaClient", return_value=mock_instance):
+        resp = app_client.post("/api/kudos/55000000001")
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "OWN_ACTIVITY"
+    mock_instance.send_kudos.assert_not_called()

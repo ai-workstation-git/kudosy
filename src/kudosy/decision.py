@@ -1,14 +1,16 @@
 """Pure decision logic — given an activity and effective config, decide whether to give kudos.
 
 Precedence (highest → lowest):
-  1. Athlete in ignoreAthletes → SKIP (IGNORE)
-  2. has_kudoed == True        → SKIP (ALREADY)
-  3. Athlete in allowAthletes  → GIVE (ALLOW) — overrides distance/time criteria
-  4. activity name matches a regex → GIVE (NAME_MATCH) — overrides thresholds
-  5. Sport type has no effective rule → SKIP (NO_RULE) — rule-gating (always active)
-  6. Stats below minDistance or minTime for sport type → SKIP (CRITERIA)
-  7. An active minDistance/minTime rule but no such value → SKIP (STAT_MISSING)
-  8. Default → GIVE (DEFAULT)
+  1. Activity of the logged-in athlete (own_athlete_id) → SKIP (OWN) — beats even the allow list
+  2. Athlete in ignoreAthletes → SKIP (IGNORE)
+  3. has_kudoed == True        → SKIP (ALREADY)
+  4. can_kudo == False (Strava refuses kudos) → SKIP (CANNOT_KUDO) — overrides allow/name match
+  5. Athlete in allowAthletes  → GIVE (ALLOW) — overrides distance/time criteria
+  6. activity name matches a regex → GIVE (NAME_MATCH) — overrides thresholds
+  7. Sport type has no effective rule → SKIP (NO_RULE) — rule-gating (always active)
+  8. Stats below minDistance or minTime for sport type → SKIP (CRITERIA)
+  9. An active minDistance/minTime rule but no such value → SKIP (STAT_MISSING)
+ 10. Default → GIVE (DEFAULT)
 
 Rule-gating (step 5): kudos are given only when the sport type has at least one
 effective Distance or Duration rule, regardless of whether it comes from a
@@ -101,18 +103,30 @@ def _check_criteria(activity: Activity, eff: EffectiveConfig) -> DecisionReason 
     return DecisionReason.STAT_MISSING if missing else None
 
 
-def decide(activity: Activity, eff: EffectiveConfig) -> Decision:
+def decide(
+    activity: Activity, eff: EffectiveConfig, *, own_athlete_id: str | None = None
+) -> Decision:
     """Decide whether to give kudos for *activity* given *eff*.
 
+    ``own_athlete_id`` is the logged-in athlete; an empty/None value disables the OWN check.
     Returns a :class:`Decision` with ``give_kudos`` and ``reason``.
     """
-    # 1. Ignore list (highest precedence)
+    # 0. Own activity (highest precedence) — Strava answers 403 to kudos on your own activity
+    own = (own_athlete_id or "").strip()
+    if own and str(activity.athlete_id).strip() == own:
+        return Decision(give_kudos=_SKIP, reason=DecisionReason.OWN)
+
+    # 1. Ignore list
     if activity.athlete_id in eff.ignoreAthletes:
         return Decision(give_kudos=_SKIP, reason=DecisionReason.IGNORE)
 
     # 2. Already kudoed
     if activity.has_kudoed:
         return Decision(give_kudos=_SKIP, reason=DecisionReason.ALREADY)
+
+    # 2b. Strava does not allow kudos (canKudo=false) — never force an attempt that gets rejected
+    if not activity.can_kudo:
+        return Decision(give_kudos=_SKIP, reason=DecisionReason.CANNOT_KUDO)
 
     # 3. Allow list → always give kudos (overrides distance/time criteria)
     if activity.athlete_id in eff.allowAthletes:

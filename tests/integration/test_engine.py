@@ -28,7 +28,7 @@ from kudosy.models import (
 
 def make_activity(
     activity_id: str = "10000000001",
-    athlete_id: str = "20000001",
+    athlete_id: str = "30000001",
     athlete_name: str = "Alex Runner",
     activity_name: str = "Morning Run",
     sport_type: str = "Run",
@@ -75,6 +75,7 @@ def make_fake_client(
     client.fetch_following_feed = AsyncMock(return_value=feed_payload)
     client.send_kudos = AsyncMock(return_value=send_kudos_result)
     client.lookup_athlete = AsyncMock(return_value=athlete_name)
+    client.fetch_current_athlete_id = AsyncMock(return_value="10000099")
     client.aclose = AsyncMock()
     return client
 

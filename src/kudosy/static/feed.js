@@ -129,9 +129,12 @@ export function renderFeed() {
       ? t('feed.decision.give')
       : t('feed.decision.skip', { reason: reasonLabel });
 
+    const kudoImpossible = act.reason === 'own' || act.reason === 'cannot_kudo';
     const kudosBadge = act.has_kudoed
       ? `<span class="feed-kudo-badge feed-kudo-done">${t('feed.kudo.done')}</span>`
-      : `<span class="feed-kudo-badge feed-kudo-pending">${t('feed.kudo.pending')}</span>`;
+      : kudoImpossible
+        ? ''
+        : `<span class="feed-kudo-badge feed-kudo-pending">${t('feed.kudo.pending')}</span>`;
 
     const displayStats = (act.stats && act.stats.display) ? act.stats.display : [];
     const statsParts   = displayStats
@@ -150,8 +153,8 @@ export function renderFeed() {
     const statsHtml  = allStats ? `<div class="feed-stats">${allStats}</div>` : '';
     const sportLabel = act.sport_type ? formatSportLabel(act.sport_type) : '—';
 
-    // Kudos button — only shown when kudos haven't been given yet
-    const kudosBtnHtml = !act.has_kudoed
+    // Kudos button — only shown when kudos haven't been given yet and are possible at all
+    const kudosBtnHtml = !act.has_kudoed && !kudoImpossible
       ? `<button class="feed-kudo-btn" data-activity-id="${act.activity_id}">${t('feed.kudo.give')}</button>`
       : '';
 

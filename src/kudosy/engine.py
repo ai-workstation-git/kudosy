@@ -33,7 +33,9 @@ _MAX_CONSECUTIVE_FAILURES = 3
 _RUN_FOOTER = "=== Beendet: {ts}  Exit-Code: {code}  Kudos: {kudos} ==="
 
 _SKIP_REASONS = {
+    DecisionReason.OWN: "--- Own activity",
     DecisionReason.IGNORE: "--- Athlete is in ignore list",
+    DecisionReason.CANNOT_KUDO: "--- Strava does not allow kudos for this activity",
     DecisionReason.ALREADY: "--- Already kudoed this activity",
     DecisionReason.CRITERIA: "--- Activity stats do not meet criteria",
     DecisionReason.STAT_MISSING: "--- Activity has no value for an active minimum rule",
@@ -148,7 +150,7 @@ async def run_kudos(
                 log.debug("--- Skipped (cached): %s — %s", act.athlete_name, act.activity_name)
                 continue
 
-            decision = decide(act, effective)
+            decision = decide(act, effective, own_athlete_id=athlete_id)
             stats_str = _fmt_stats(act.stats)
             log.debug(
                 "Athlete: %s, Activity: %s, Type: %s, Has Kudoed: %s, Stats: %s",
